@@ -33,7 +33,7 @@ def extract_video_info(url):
         'source_address': '0.0.0.0',
         # Updated user-agent to a more recent browser version
         'http_headers': {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36',
         },
         # Add youtube-dl specific options
         'youtube_include_dash_manifest': False,
@@ -130,19 +130,73 @@ def extract_video_info(url):
                     }
                 }
 
-                with yt_dlp.YoutubeDL(third_opts) as third_ydl:
-                    info = third_ydl.extract_info(url, download=False)
+                try:
+                    with yt_dlp.YoutubeDL(third_opts) as third_ydl:
+                        info = third_ydl.extract_info(url, download=False)
 
-                    # Verify we have the necessary information
-                    if not info.get('id') or not info.get('title'):
-                        print(f"Warning: Incomplete video information extracted (third attempt): {info}")
+                        # Verify we have the necessary information
+                        if not info.get('id') or not info.get('title'):
+                            print(f"Warning: Incomplete video information extracted (third attempt): {info}")
+                            raise Exception("Incomplete video information")
 
+                        return {
+                            'id': info.get('id'),
+                            'title': info.get('title', 'Unknown Title'),
+                            'url': url,
+                            'thumbnail': info.get('thumbnail', ''),
+                            'duration': info.get('duration', 0),
+                            'added_time': time.time()
+                        }
+                except Exception as e:
+                    print(f"Third info extraction attempt failed: {e}")
+                    print("Trying fourth extraction method with invidious API...")
+
+                    # Fourth attempt using invidious API as a fallback
+                    try:
+                        import requests
+                        import json
+                        import random
+
+                        # List of public invidious instances
+                        invidious_instances = [
+                            "https://invidious.snopyta.org",
+                            "https://yewtu.be",
+                            "https://invidious.kavin.rocks",
+                            "https://vid.puffyan.us",
+                            "https://invidious.namazso.eu"
+                        ]
+
+                        # Select a random instance
+                        instance = random.choice(invidious_instances)
+                        video_id = url.split('v=')[1].split('&')[0] if 'v=' in url else url.split('/')[-1]
+                        api_url = f"{instance}/api/v1/videos/{video_id}"
+
+                        print(f"Trying invidious API for info extraction: {api_url}")
+
+                        response = requests.get(api_url, timeout=10)
+                        if response.status_code == 200:
+                            data = response.json()
+
+                            return {
+                                'id': video_id,
+                                'title': data.get('title', 'Unknown Title (Invidious)'),
+                                'url': url,
+                                'thumbnail': data.get('thumbnailUrl', ''),
+                                'duration': data.get('lengthSeconds', 0),
+                                'added_time': time.time()
+                            }
+                        else:
+                            print(f"Invidious API returned status code: {response.status_code}")
+                    except Exception as e:
+                        print(f"Invidious API info extraction failed: {e}")
+
+                    # If all methods fail, return minimal info
                     return {
-                        'id': info.get('id'),
-                        'title': info.get('title', 'Unknown Title'),
+                        'id': 'unknown',
+                        'title': f"Unknown Title (URL: {url})",
                         'url': url,
-                        'thumbnail': info.get('thumbnail', ''),
-                        'duration': info.get('duration', 0),
+                        'thumbnail': '',
+                        'duration': 0,
                         'added_time': time.time()
                     }
 
@@ -175,7 +229,7 @@ def download_and_play_video(video_info):
         'source_address': '0.0.0.0',
         # Updated user-agent to a more recent browser version
         'http_headers': {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36',
         },
         # Add youtube-dl specific options
         'youtube_include_dash_manifest': False,  # Skip DASH manifests that might cause issues
@@ -274,16 +328,90 @@ def download_and_play_video(video_info):
                         # Make sure we have a valid URL
                         if 'url' not in info:
                             print("Error: No URL found in third extraction attempt")
+                            print("Trying fourth extraction method with invidious API...")
+
+                            # Fourth attempt using invidious API as a fallback
+                            try:
+                                import requests
+                                import json
+                                import random
+
+                                # List of public invidious instances
+                                invidious_instances = [
+                                    "https://invidious.snopyta.org",
+                                    "https://yewtu.be",
+                                    "https://invidious.kavin.rocks",
+                                    "https://vid.puffyan.us",
+                                    "https://invidious.namazso.eu"
+                                ]
+
+                                # Select a random instance
+                                instance = random.choice(invidious_instances)
+                                video_id = video_info['url'].split('v=')[1].split('&')[0]
+                                api_url = f"{instance}/api/v1/videos/{video_id}"
+
+                                print(f"Trying invidious API: {api_url}")
+
+                                response = requests.get(api_url, timeout=10)
+                                if response.status_code == 200:
+                                    data = response.json()
+
+                                    # Find audio streams
+                                    audio_formats = [f for f in data.get('adaptiveFormats', []) 
+                                                    if f.get('type', '').startswith('audio/')]
+
+                                    if audio_formats:
+                                        # Sort by bitrate (highest first)
+                                        audio_formats.sort(key=lambda x: x.get('bitrate', 0), reverse=True)
+                                        url = audio_formats[0]['url']
+                                        print(f"Extracted audio URL (invidious API): {url}")
+                                        return url
+                                    else:
+                                        print("No audio formats found in invidious API response")
+                            except Exception as e:
+                                print(f"Invidious API extraction failed: {e}")
+
+                            # If we get here, all extraction methods have failed
+                            print("All extraction methods failed, cannot play this video")
                             return
 
                         url = info['url']
                         print(f"Extracted audio URL (third attempt): {url}")
 
         # Final validation check for the URL
-        if not url or any(img_ext in url.lower() for img_ext in ['.jpg', '.jpeg', '.png', '.webp', 'storyboard']):
+        if not url:
+            print("Error: No URL extracted after all attempts")
+            return
+
+        # Check if URL is an image or storyboard
+        if any(img_ext in url.lower() for img_ext in ['.jpg', '.jpeg', '.png', '.webp', 'storyboard']):
             print(f"Error: Invalid audio URL detected: {url}")
             print("URL appears to be an image or storyboard, not an audio stream")
-            return
+
+            # Try one more approach - direct YouTube embed URL
+            try:
+                print("Attempting to use YouTube embed URL as a last resort...")
+                video_id = None
+
+                # Extract video ID from the original URL
+                if "youtube.com/watch?v=" in video_info['url']:
+                    video_id = video_info['url'].split("v=")[1].split("&")[0]
+                elif "youtu.be/" in video_info['url']:
+                    video_id = video_info['url'].split("youtu.be/")[1].split("?")[0]
+
+                if video_id:
+                    # Try to use the YouTube embed URL which sometimes works when the API fails
+                    embed_url = f"https://www.youtube.com/embed/{video_id}?autoplay=1&controls=0"
+                    print(f"Using YouTube embed URL: {embed_url}")
+
+                    # This is a workaround - VLC might be able to extract the audio from the embed page
+                    url = embed_url
+                else:
+                    print("Could not extract video ID from URL")
+                    return
+            except Exception as e:
+                print(f"Error creating embed URL: {e}")
+                return
 
         # Check if URL is accessible
         try:

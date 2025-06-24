@@ -84,17 +84,26 @@ python app.py
 
 - If you see YouTube API errors or "Precondition check failed" messages:
   - YouTube may be blocking requests from your IP or the Raspberry Pi
-  - The application will automatically try multiple extraction methods with different configurations
+  - The application will automatically try multiple extraction methods with different configurations:
+    1. Standard yt-dlp extraction with Android player client
+    2. Alternative extraction with DASH manifest enabled
+    3. Third extraction method with web player client and geo-bypass
+    4. Invidious API as a fallback (uses alternative YouTube front-ends)
+    5. Direct YouTube embed URL as a last resort
   - If all extraction methods fail, try these solutions:
     - Restart the application (sometimes temporary issues resolve themselves)
     - Update yt-dlp to the latest version: `pip install -U yt-dlp`
     - Try a different YouTube video (some videos have more restrictions than others)
     - Consider using a VPN or proxy if YouTube is blocking your region
+    - Check if the video is available in your country (some videos are geo-restricted)
 
 - If you see "Signature extraction failed" or "Only images are available" errors:
   - This is a known issue with some YouTube videos and yt-dlp
-  - The application includes multiple fallback methods to try different extraction approaches
-  - If all methods fail, try a different YouTube video or update yt-dlp
+  - The application now includes advanced fallback methods:
+    - Invidious API integration that uses alternative YouTube front-ends
+    - Direct YouTube embed URL approach as a last resort
+  - These fallbacks often work when standard extraction methods fail
+  - If all methods still fail, try a different YouTube video or update yt-dlp
 
 - If you see "HTTP 404 error" messages:
   - The application will validate URLs before attempting playback to avoid this issue
