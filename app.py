@@ -659,11 +659,15 @@ def get_queue():
 @app.route('/skip', methods=['POST'])
 def skip_video():
     """Skip the current video"""
-    global player
+    global player, current_video
 
     with player_lock:
         if player:
             player.stop()
+
+    # Reset current_video so the player thread picks up the next video
+    with queue_lock:
+        current_video = None
 
     return redirect(url_for('index'))
 
