@@ -22,7 +22,8 @@ def extract_video_info(url):
     """Extract video information from YouTube URL"""
     # Use the same improved options as in download_and_play_video
     ydl_opts = {
-        'format': 'bestaudio[ext=m4a]/bestaudio/best',
+        # More specific format selection to target audio streams
+        'format': 'bestaudio[ext=m4a]/bestaudio[ext=mp3]/bestaudio[ext=webm]/bestaudio/best',
         'noplaylist': True,
         'quiet': False,  # Set to False for debugging
         'nocheckcertificate': True,
@@ -30,35 +31,121 @@ def extract_video_info(url):
         'logtostderr': False,
         'default_search': 'auto',
         'source_address': '0.0.0.0',
-        # Add user-agent to avoid restrictions
+        # Updated user-agent to a more recent browser version
         'http_headers': {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        },
+        # Add youtube-dl specific options
+        'youtube_include_dash_manifest': False,
+        'extractor_args': {
+            'youtube': {
+                'player_client': ['android'],
+                'skip': ['hls', 'dash'],
+            }
         }
     }
 
     try:
         print(f"Extracting info for URL: {url}")
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            info = ydl.extract_info(url, download=False)
 
-            # Verify we have the necessary information
-            if not info.get('id') or not info.get('title'):
-                print(f"Warning: Incomplete video information extracted: {info}")
+        # First attempt with standard options
+        try:
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                info = ydl.extract_info(url, download=False)
 
-            # For debugging, print available formats
-            if 'formats' in info:
-                print("Available formats:")
-                for fmt in info.get('formats', []):
-                    print(f"  {fmt.get('format_id')}: {fmt.get('ext')} - {fmt.get('format_note', 'N/A')}")
+                # Check if we got actual audio formats
+                if 'formats' in info:
+                    audio_formats = [f for f in info.get('formats', []) 
+                                    if f.get('acodec') != 'none' and f.get('vcodec') == 'none']
 
-            return {
-                'id': info.get('id'),
-                'title': info.get('title', 'Unknown Title'),
-                'url': url,
-                'thumbnail': info.get('thumbnail', ''),
-                'duration': info.get('duration', 0),
-                'added_time': time.time()
-            }
+                    print("Available formats:")
+                    for fmt in info.get('formats', []):
+                        print(f"  {fmt.get('format_id')}: {fmt.get('ext')} - {fmt.get('format_note', 'N/A')}")
+
+                    if not audio_formats:
+                        print("Warning: No audio-only formats found")
+
+                # Verify we have the necessary information
+                if not info.get('id') or not info.get('title'):
+                    print(f"Warning: Incomplete video information extracted: {info}")
+
+                return {
+                    'id': info.get('id'),
+                    'title': info.get('title', 'Unknown Title'),
+                    'url': url,
+                    'thumbnail': info.get('thumbnail', ''),
+                    'duration': info.get('duration', 0),
+                    'added_time': time.time()
+                }
+
+        except Exception as e:
+            print(f"First info extraction attempt failed: {e}")
+            print("Trying alternative extraction method...")
+
+            # Second attempt with different options
+            alt_opts = ydl_opts.copy()
+            alt_opts['format'] = 'bestaudio/best'  # Simpler format selection
+            alt_opts['youtube_include_dash_manifest'] = True  # Try including DASH
+
+            try:
+                with yt_dlp.YoutubeDL(alt_opts) as alt_ydl:
+                    info = alt_ydl.extract_info(url, download=False)
+
+                    # Verify we have the necessary information
+                    if not info.get('id') or not info.get('title'):
+                        print(f"Warning: Incomplete video information extracted (second attempt): {info}")
+
+                    return {
+                        'id': info.get('id'),
+                        'title': info.get('title', 'Unknown Title'),
+                        'url': url,
+                        'thumbnail': info.get('thumbnail', ''),
+                        'duration': info.get('duration', 0),
+                        'added_time': time.time()
+                    }
+            except Exception as e:
+                print(f"Second info extraction attempt failed: {e}")
+                print("Trying third extraction method...")
+
+                # Third attempt with completely different approach
+                third_opts = {
+                    'format': 'bestaudio',
+                    'quiet': False,
+                    'no_warnings': False,
+                    'nocheckcertificate': True,
+                    'ignoreerrors': False,
+                    'logtostderr': False,
+                    'geo_bypass': True,  # Try to bypass geo-restrictions
+                    'geo_bypass_country': 'US',  # Pretend to be in the US
+                    'http_headers': {
+                        'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64; rv:109.0) Gecko/20100101 Firefox/115.0',
+                        'Accept-Language': 'en-US,en;q=0.5',
+                        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+                    },
+                    'extractor_args': {
+                        'youtube': {
+                            'player_client': ['web'],  # Try web client instead
+                            'skip': [],  # Don't skip any formats
+                        }
+                    }
+                }
+
+                with yt_dlp.YoutubeDL(third_opts) as third_ydl:
+                    info = third_ydl.extract_info(url, download=False)
+
+                    # Verify we have the necessary information
+                    if not info.get('id') or not info.get('title'):
+                        print(f"Warning: Incomplete video information extracted (third attempt): {info}")
+
+                    return {
+                        'id': info.get('id'),
+                        'title': info.get('title', 'Unknown Title'),
+                        'url': url,
+                        'thumbnail': info.get('thumbnail', ''),
+                        'duration': info.get('duration', 0),
+                        'added_time': time.time()
+                    }
+
     except Exception as e:
         print(f"Error extracting video info: {e}")
         # Return minimal info so the queue still works
@@ -77,7 +164,8 @@ def download_and_play_video(video_info):
 
     # Streaming options with improved configuration
     ydl_opts = {
-        'format': 'bestaudio[ext=m4a]/bestaudio/best',
+        # More specific format selection to target audio streams
+        'format': 'bestaudio[ext=m4a]/bestaudio[ext=mp3]/bestaudio[ext=webm]/bestaudio/best',
         'quiet': False,  # Set to False to see detailed output for debugging
         'noplaylist': True,
         'nocheckcertificate': True,
@@ -85,9 +173,17 @@ def download_and_play_video(video_info):
         'logtostderr': False,
         'default_search': 'auto',
         'source_address': '0.0.0.0',
-        # Add user-agent to avoid restrictions
+        # Updated user-agent to a more recent browser version
         'http_headers': {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        },
+        # Add youtube-dl specific options
+        'youtube_include_dash_manifest': False,  # Skip DASH manifests that might cause issues
+        'extractor_args': {
+            'youtube': {
+                'player_client': ['android'],  # Try android client which might be more reliable
+                'skip': ['hls', 'dash'],  # Skip HLS and DASH formats which might cause issues
+            }
         }
     }
 
@@ -95,15 +191,133 @@ def download_and_play_video(video_info):
         # Get the direct streaming URL
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             print(f"Extracting audio from: {video_info['url']}")
-            info = ydl.extract_info(video_info['url'], download=False)
 
-            # Make sure we have a valid URL
-            if 'url' not in info:
-                print("Error: No URL found in extracted info")
+            # First attempt with standard options
+            try:
+                info = ydl.extract_info(video_info['url'], download=False)
+
+                # Check if we got actual audio formats or just images
+                if 'formats' in info:
+                    audio_formats = [f for f in info.get('formats', []) 
+                                    if f.get('acodec') != 'none' and f.get('vcodec') == 'none']
+
+                    if not audio_formats and 'url' in info:
+                        # If no specific audio formats but we have a direct URL, check if it's not an image
+                        if any(img_ext in info['url'] for img_ext in ['.jpg', '.jpeg', '.png', '.webp']):
+                            print("Warning: URL appears to be an image, not an audio stream")
+                            raise Exception("No valid audio stream found, only images")
+
+                # Make sure we have a valid URL
+                if 'url' not in info:
+                    print("Error: No URL found in extracted info")
+                    raise Exception("No URL found in extracted info")
+
+                url = info['url']
+
+                # Check if URL is an image (storyboard)
+                if any(img_ext in url for img_ext in ['.jpg', '.jpeg', '.png', '.webp']):
+                    print(f"Warning: Extracted URL appears to be an image: {url}")
+                    raise Exception("Extracted URL is an image, not an audio stream")
+
+                print(f"Extracted audio URL: {url}")
+
+            except Exception as e:
+                print(f"First extraction attempt failed: {e}")
+                print("Trying alternative extraction method...")
+
+                # Second attempt with different options
+                alt_opts = ydl_opts.copy()
+                alt_opts['format'] = 'bestaudio/best'  # Simpler format selection
+                alt_opts['youtube_include_dash_manifest'] = True  # Try including DASH
+
+                try:
+                    with yt_dlp.YoutubeDL(alt_opts) as alt_ydl:
+                        info = alt_ydl.extract_info(video_info['url'], download=False)
+
+                        # Make sure we have a valid URL
+                        if 'url' not in info:
+                            print("Error: No URL found in second extraction attempt")
+                            raise Exception("No URL found in second extraction attempt")
+
+                        url = info['url']
+                        print(f"Extracted audio URL (second attempt): {url}")
+                except Exception as e:
+                    print(f"Second extraction attempt failed: {e}")
+                    print("Trying third extraction method...")
+
+                    # Third attempt with completely different approach
+                    third_opts = {
+                        'format': 'bestaudio',
+                        'quiet': False,
+                        'no_warnings': False,
+                        'nocheckcertificate': True,
+                        'ignoreerrors': False,
+                        'logtostderr': False,
+                        'geo_bypass': True,  # Try to bypass geo-restrictions
+                        'geo_bypass_country': 'US',  # Pretend to be in the US
+                        'http_headers': {
+                            'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64; rv:109.0) Gecko/20100101 Firefox/115.0',
+                            'Accept-Language': 'en-US,en;q=0.5',
+                            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+                        },
+                        'extractor_args': {
+                            'youtube': {
+                                'player_client': ['web'],  # Try web client instead
+                                'skip': [],  # Don't skip any formats
+                            }
+                        }
+                    }
+
+                    with yt_dlp.YoutubeDL(third_opts) as third_ydl:
+                        info = third_ydl.extract_info(video_info['url'], download=False)
+
+                        # Make sure we have a valid URL
+                        if 'url' not in info:
+                            print("Error: No URL found in third extraction attempt")
+                            return
+
+                        url = info['url']
+                        print(f"Extracted audio URL (third attempt): {url}")
+
+        # Final validation check for the URL
+        if not url or any(img_ext in url.lower() for img_ext in ['.jpg', '.jpeg', '.png', '.webp', 'storyboard']):
+            print(f"Error: Invalid audio URL detected: {url}")
+            print("URL appears to be an image or storyboard, not an audio stream")
+            return
+
+        # Check if URL is accessible
+        try:
+            import urllib.request
+            import urllib.error
+
+            print(f"Validating URL accessibility: {url}")
+            req = urllib.request.Request(
+                url, 
+                headers={
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                    'Range': 'bytes=0-1000'  # Just request the first 1000 bytes to check accessibility
+                }
+            )
+            response = urllib.request.urlopen(req, timeout=5)
+            content_type = response.headers.get('Content-Type', '')
+
+            print(f"URL validation successful. Content-Type: {content_type}")
+
+            # Check if content type is audio or video
+            if not any(media_type in content_type.lower() for media_type in ['audio', 'video', 'mp4', 'mp3', 'ogg', 'webm']):
+                print(f"Warning: Content-Type does not appear to be audio/video: {content_type}")
+                # Continue anyway as VLC might still be able to handle it
+
+        except urllib.error.HTTPError as e:
+            print(f"HTTP Error validating URL: {e.code} - {e.reason}")
+            if e.code == 404:
+                print("URL returns 404 Not Found, cannot play this stream")
                 return
-
-            url = info['url']
-            print(f"Extracted audio URL: {url}")
+            # For other HTTP errors, we'll still try to play
+            print("Continuing despite HTTP error...")
+        except Exception as e:
+            print(f"Error validating URL: {e}")
+            print("Continuing anyway...")
 
         # Play the audio directly from the URL
         with player_lock:
@@ -114,12 +328,21 @@ def download_and_play_video(video_info):
 
             # Create a new VLC instance with verbose logging and audio output configuration
             vlc_args = [
-                '--verbose=2',                # Verbose logging
+                '--verbose=3',                # More verbose logging for debugging
                 '--aout=alsa',                # Use ALSA audio output
-                '--alsa-audio-device=default' # Use default ALSA device (3.5mm jack if configured)
+                '--alsa-audio-device=default', # Use default ALSA device (3.5mm jack if configured)
+                '--audio-filter=compressor',  # Add audio compression to normalize volume
+                '--file-caching=3000',        # Increase file cache
+                '--network-caching=3000',     # Increase network cache
+                '--sout-mux-caching=3000',    # Increase mux cache
+                '--no-video',                 # Disable video output since we only need audio
+                '--audio-replay-gain-mode=track' # Apply replay gain
             ]
             instance = vlc.Instance(' '.join(vlc_args))
             player = instance.media_player_new()
+
+            # Set audio output volume to maximum
+            player.audio_set_volume(100)
 
             # Try to set audio output device explicitly
             try:
@@ -128,20 +351,45 @@ def download_and_play_video(video_info):
                 if audio_output:
                     print("Available audio output devices:")
                     for device in audio_output:
-                        print(f"  - {device.description} ({device.device})")
+                        try:
+                            print(f"  - {device.description} ({device.device})")
+                        except:
+                            print(f"  - Device info unavailable")
 
-                    # Try to find and use the 3.5mm jack
+                    # First try to find and use the headphones/analog output
+                    headphones_device = None
                     for device in audio_output:
-                        if "analog" in device.description.lower() or "headphones" in device.description.lower():
-                            print(f"Setting audio output to: {device.description}")
-                            player.audio_output_device_set(None, device.device)
-                            break
+                        try:
+                            desc = str(device.description).lower()
+                            if "analog" in desc or "headphones" in desc or "3.5" in desc or "bcm2835" in desc:
+                                headphones_device = device
+                                print(f"Found headphones/analog device: {device.device}")
+                                break
+                        except:
+                            continue
+
+                    # If headphones device found, use it
+                    if headphones_device:
+                        try:
+                            print(f"Setting audio output to: {headphones_device.device}")
+                            player.audio_output_device_set(None, headphones_device.device)
+                        except Exception as e:
+                            print(f"Error setting headphones device: {e}")
+                    else:
+                        print("No headphones/analog device found, using default")
             except Exception as e:
-                print(f"Error setting audio output device: {e}")
+                print(f"Error enumerating audio output devices: {e}")
+                print("Falling back to default audio device")
 
             # Create media with proper options
             media = instance.media_new(url)
-            media.add_option('network-caching=1000')  # Increase network buffer
+
+            # Add media options for better streaming
+            media.add_option(':network-caching=3000')  # Increase network buffer
+            media.add_option(':file-caching=3000')     # Increase file buffer
+            media.add_option(':sout-mux-caching=3000') # Increase mux buffer
+            media.add_option(':no-video')              # Disable video
+            media.add_option(':audio-filter=compressor') # Add audio compression
 
             # Set up event manager to monitor playback
             events = player.event_manager()

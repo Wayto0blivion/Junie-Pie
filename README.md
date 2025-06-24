@@ -76,19 +76,34 @@ python app.py
 - If videos aren't playing or there's no audio output:
   - Make sure VLC is properly installed: `sudo apt install vlc`
   - Ensure your Raspberry Pi has internet access
-  - Try updating yt-dlp to the latest version: `pip install -U yt-dlp`
+  - Update yt-dlp to the latest version: `pip install -U yt-dlp`
   - Check the console output for errors when videos are added to the queue
   - Test audio output directly with: `aplay /usr/share/sounds/alsa/Front_Center.wav`
   - Try playing a YouTube video directly with VLC to verify your setup: `vlc https://www.youtube.com/watch?v=dQw4w9WgXcQ`
+  - Verify that your 3.5mm jack is working by connecting headphones and testing
 
 - If you see YouTube API errors or "Precondition check failed" messages:
   - YouTube may be blocking requests from your IP or the Raspberry Pi
-  - Try updating the user-agent in app.py to a more recent browser version
-  - Consider using a VPN or proxy if YouTube is blocking your region
+  - The application will automatically try multiple extraction methods with different configurations
+  - If all extraction methods fail, try these solutions:
+    - Restart the application (sometimes temporary issues resolve themselves)
+    - Update yt-dlp to the latest version: `pip install -U yt-dlp`
+    - Try a different YouTube video (some videos have more restrictions than others)
+    - Consider using a VPN or proxy if YouTube is blocking your region
+
+- If you see "Signature extraction failed" or "Only images are available" errors:
+  - This is a known issue with some YouTube videos and yt-dlp
+  - The application includes multiple fallback methods to try different extraction approaches
+  - If all methods fail, try a different YouTube video or update yt-dlp
+
+- If you see "HTTP 404 error" messages:
+  - The application will validate URLs before attempting playback to avoid this issue
+  - If you still see these errors, it may indicate that YouTube has changed their API
+  - Update yt-dlp to the latest version: `pip install -U yt-dlp`
 
 - If the web interface isn't accessible, ensure you're using the correct IP address and that the Raspberry Pi is on the same network as your device.
 
-- For more detailed debugging, check the application logs in the terminal where you started the app.
+- For more detailed debugging, check the application logs in the terminal where you started the app. The application includes comprehensive logging to help diagnose issues.
 
 ## License
 
