@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Junie-Pie - YouTube Queue Player</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body {
+            padding-top: 20px;
+            padding-bottom: 20px;
+        }
+        .thumbnail {
+            width: 120px;
+            height: auto;
+        }
+        .video-item {
+            margin-bottom: 10px;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        .current-video {
+            background-color: #f8f9fa;
+            padding: 15px;
+            margin-bottom: 20px;
+            border-radius: 5px;
+            border: 1px solid #ddd;
+        }
+        .queue-container {
+            max-height: 500px;
+            overflow-y: auto;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="row">
+            <div class="col-md-12 text-center mb-4">
+                <h1>Junie-Pie</h1>
+                <p class="lead">Raspberry Pi YouTube Queue Player</p>
+            </div>
+        </div>
+
+        <div class="row mb-4">
+            <div class="col-md-12">
+                <div class="card">
+                    <div class="card-header">
+                        <h5>Add a YouTube Video</h5>
+                    </div>
+                    <div class="card-body">
+                        <form action="/add" method="POST">
+                            <div class="input-group">
+                                <input type="text" class="form-control" name="url" placeholder="YouTube URL" required>
+                                <button type="submit" class="btn btn-primary">Add to Queue</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="col-md-12">
+                <h3>Now Playing</h3>
+                <div id="current-video" class="current-video">
+                    <p class="text-muted">Nothing playing right now</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="col-md-12">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h3>Queue</h3>
+                    <form action="/skip" method="POST" id="skip-form">
+                        <button type="submit" class="btn btn-warning" id="skip-button" disabled>Skip Current</button>
+                    </form>
+                </div>
+                <div id="queue-container" class="queue-container">
+                    <p class="text-muted" id="empty-queue">Queue is empty</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // Function to format time in minutes and seconds
+        function formatTime(seconds) {
+            if (!seconds) return "Unknown";
+            const minutes = Math.floor(seconds / 60);
+            const remainingSeconds = Math.floor(seconds % 60);
+            return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
+        }
+
+        // Function to update the queue display
+        function updateQueue() {
+            fetch('/queue')
+                .then(response => response.json())
+                .then(data => {
+                    // Update current video
+                    const currentVideoElement = document.getElementById('current-video');
+                    if (data.current) {
+                        currentVideoElement.innerHTML = `
+                            <div class="row">
+                                <div class="col-md-2">
+                                    <img src="${data.current.thumbnail}" alt="${data.current.title}" class="img-fluid thumbnail">
+                                </div>
+                                <div class="col-md-10">
+                                    <h5>${data.current.title}</h5>
+                                    <p>Duration: ${formatTime(data.current.duration)}</p>
+                                </div>
+                            </div>
+                        `;
+                        document.getElementById('skip-button').disabled = false;
+                    } else {
+                        currentVideoElement.innerHTML = '<p class="text-muted">Nothing playing right now</p>';
+                        document.getElementById('skip-button').disabled = true;
+                    }
+
+                    // Update queue
+                    const queueContainer = document.getElementById('queue-container');
+                    const emptyQueue = document.getElementById('empty-queue');
+                    
+                    if (data.queue.length > 0) {
+                        emptyQueue.style.display = 'none';
+                        
+                        let queueHtml = '';
+                        data.queue.forEach((video, index) => {
+                            queueHtml += `
+                                <div class="video-item">
+                                    <div class="row">
+                                        <div class="col-md-2">
+                                            <img src="${video.thumbnail}" alt="${video.title}" class="img-fluid thumbnail">
+                                        </div>
+                                        <div class="col-md-10">
+                                            <h5>${index + 1}. ${video.title}</h5>
+                                            <p>Duration: ${formatTime(video.duration)}</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            `;
+                        });
+                        
+                        queueContainer.innerHTML = queueHtml;
+                    } else {
+                        emptyQueue.style.display = 'block';
+                        queueContainer.innerHTML = '<p class="text-muted" id="empty-queue">Queue is empty</p>';
+                    }
+                })
+                .catch(error => console.error('Error fetching queue:', error));
+        }
+
+        // Update the queue every 2 seconds
+        setInterval(updateQueue, 2000);
+        
+        // Initial update
+        updateQueue();
+    </script>
+</body>
+</html>
