@@ -73,9 +73,22 @@ python app.py
   ```
   Then navigate to System Options > Audio > 3.5mm jack.
 
-- If videos aren't playing, check that VLC is properly installed and that the Raspberry Pi has internet access.
+- If videos aren't playing or there's no audio output:
+  - Make sure VLC is properly installed: `sudo apt install vlc`
+  - Ensure your Raspberry Pi has internet access
+  - Try updating yt-dlp to the latest version: `pip install -U yt-dlp`
+  - Check the console output for errors when videos are added to the queue
+  - Test audio output directly with: `aplay /usr/share/sounds/alsa/Front_Center.wav`
+  - Try playing a YouTube video directly with VLC to verify your setup: `vlc https://www.youtube.com/watch?v=dQw4w9WgXcQ`
+
+- If you see YouTube API errors or "Precondition check failed" messages:
+  - YouTube may be blocking requests from your IP or the Raspberry Pi
+  - Try updating the user-agent in app.py to a more recent browser version
+  - Consider using a VPN or proxy if YouTube is blocking your region
 
 - If the web interface isn't accessible, ensure you're using the correct IP address and that the Raspberry Pi is on the same network as your device.
+
+- For more detailed debugging, check the application logs in the terminal where you started the app.
 
 ## License
 
